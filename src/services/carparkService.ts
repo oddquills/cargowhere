@@ -19,6 +19,7 @@ export interface DataGovSgItem {
 export interface FetchResult {
   carparks: Carpark[];
   isLiveApiConnected: boolean;
+  isLtaDataMallConnected: boolean;
   timestamp: string;
   totalAvailableLots: number;
   totalCapacity: number;
@@ -39,11 +40,55 @@ export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lo
   return Math.round(R * c * 10) / 10;
 }
 
-// Fetch live carpark lots availability from data.gov.sg
+// Fetch live carpark lots availability from LTA DataMall (/api/carparkavailability) and data.gov.sg
 export async function fetchLiveCarparks(userCoords?: [number, number]): Promise<FetchResult> {
   let isLiveApiConnected = false;
+  let isLtaDataMallConnected = false;
   let apiMap = new Map<string, { carAvail: number; carTotal: number; motoAvail?: number; motoTotal?: number }>();
 
+  // 1. First, attempt to pull from our serverless LTA DataMall connection
+  try {
+    const ltaRes = await fetch('/api/carparkavailability?all=true', {
+      headers: { Accept: 'application/json' },
+    });
+    if (ltaRes.ok) {
+      const ltaJson = await ltaRes.json();
+      if (ltaJson.success && Array.isArray(ltaJson.value) && ltaJson.value.length > 0) {
+        isLtaDataMallConnected = true;
+        isLiveApiConnected = true;
+        for (const item of ltaJson.value) {
+          const id = (item.CarParkID || '').trim().toUpperCase();
+          const dev = (item.Development || '').trim().toUpperCase();
+          const avail = Number(item.AvailableLots) || 0;
+          const lotType = item.LotType;
+
+          if (id) {
+            const existing = apiMap.get(id) || { carAvail: 0, carTotal: 0, motoAvail: 0, motoTotal: 0 };
+            if (lotType === 'Y') {
+              existing.motoAvail = avail;
+            } else {
+              existing.carAvail = avail;
+            }
+            apiMap.set(id, existing);
+          }
+          if (dev) {
+            const existing = apiMap.get(dev) || { carAvail: 0, carTotal: 0, motoAvail: 0, motoTotal: 0 };
+            if (lotType === 'Y') {
+              existing.motoAvail = avail;
+            } else {
+              existing.carAvail = avail;
+            }
+            apiMap.set(dev, existing);
+          }
+        }
+      }
+    }
+  } catch (ltaErr) {
+    // Serverless endpoint offline or not running in full-stack mode
+    console.debug('LTA DataMall serverless endpoint note:', ltaErr);
+  }
+
+  // 2. Query Data.gov.sg as secondary/parallel live government feed
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
@@ -83,14 +128,18 @@ export async function fetchLiveCarparks(userCoords?: [number, number]): Promise<
             }
           }
 
-          apiMap.set(num, { carAvail, carTotal, motoAvail, motoTotal });
+          const current = apiMap.get(num);
+          apiMap.set(num, {
+            carAvail: current?.carAvail && isLtaDataMallConnected ? current.carAvail : carAvail,
+            carTotal: carTotal > 0 ? carTotal : (current?.carTotal || 0),
+            motoAvail: current?.motoAvail && isLtaDataMallConnected ? current.motoAvail : motoAvail,
+            motoTotal: motoTotal > 0 ? motoTotal : (current?.motoTotal || 0),
+          });
         }
       }
     }
   } catch (err) {
-    // Graceful fallback to real-time realistic simulation
     console.warn('Real-time Gov API call note (using local high-fidelity fallback):', err);
-    isLiveApiConnected = false;
   }
 
   // Get current hour in Singapore (UTC+8)
@@ -155,6 +204,7 @@ export async function fetchLiveCarparks(userCoords?: [number, number]): Promise<
   return {
     carparks: updatedCarparks,
     isLiveApiConnected,
+    isLtaDataMallConnected,
     timestamp: now.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     totalAvailableLots,
     totalCapacity,

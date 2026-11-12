@@ -44,6 +44,7 @@ export default function App() {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [isLiveApiConnected, setIsLiveApiConnected] = useState<boolean>(false);
+  const [isLtaDataMallConnected, setIsLtaDataMallConnected] = useState<boolean>(false);
   const [totalAvailable, setTotalAvailable] = useState<number>(0);
   const [totalCapacity, setTotalCapacity] = useState<number>(0);
   const [isRateGuideOpen, setIsRateGuideOpen] = useState<boolean>(false);
@@ -61,6 +62,7 @@ export default function App() {
       const result = await fetchLiveCarparks(coords || userLocation || undefined);
       setCarparks(result.carparks);
       setIsLiveApiConnected(result.isLiveApiConnected);
+      setIsLtaDataMallConnected(result.isLtaDataMallConnected);
       setLastUpdated(result.timestamp);
       setTotalAvailable(result.totalAvailableLots);
       setTotalCapacity(result.totalCapacity);
@@ -239,6 +241,7 @@ export default function App() {
         totalAvailable={totalAvailable}
         totalCapacity={totalCapacity}
         isLiveApiConnected={isLiveApiConnected}
+        isLtaDataMallConnected={isLtaDataMallConnected}
       />
 
       {/* Auto-refresh indicator sub-bar */}

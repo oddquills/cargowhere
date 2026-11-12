@@ -7,6 +7,7 @@ interface StatsBarProps {
   totalAvailable: number;
   totalCapacity: number;
   isLiveApiConnected: boolean;
+  isLtaDataMallConnected?: boolean;
 }
 
 export const StatsBar: React.FC<StatsBarProps> = ({
@@ -14,6 +15,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
   totalAvailable,
   totalCapacity,
   isLiveApiConnected,
+  isLtaDataMallConnected,
 }) => {
   const highAvailCount = carparks.filter((c) => c.availableLots > 30).length;
   const evTotalPoints = carparks.reduce((sum, c) => sum + (c.evChargers.available ? c.evChargers.count : 0), 0);
@@ -84,11 +86,19 @@ export const StatsBar: React.FC<StatsBarProps> = ({
         <div className="flex items-center gap-1.5 text-slate-400 text-[11px] ml-auto">
           <span
             className={`w-2 h-2 rounded-full ${
-              isLiveApiConnected ? 'bg-emerald-400 shadow-xs shadow-emerald-400/50' : 'bg-sky-400'
+              isLtaDataMallConnected
+                ? 'bg-cyan-400 shadow-xs shadow-cyan-400/50'
+                : isLiveApiConnected
+                ? 'bg-emerald-400 shadow-xs shadow-emerald-400/50'
+                : 'bg-sky-400'
             }`}
           />
           <span className="font-medium text-slate-300">
-            {isLiveApiConnected ? 'Data.gov.sg Active' : 'SGT Real-Time Feeds'}
+            {isLtaDataMallConnected
+              ? 'LTA DataMall Active'
+              : isLiveApiConnected
+              ? 'Data.gov.sg Active'
+              : 'SGT Real-Time Feeds'}
           </span>
         </div>
       </div>
